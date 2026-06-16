@@ -1,0 +1,92 @@
+services:
+  redis-node-1:
+    image: redis-ssh:latest
+    build:
+      context: .
+      dockerfile: Containerfile
+    container_name: redis-node-1
+    hostname: redis-node-1
+    ports:
+      - "2201:22"
+    networks:
+      redis-net:
+        ipv4_address: 10.10.0.11
+
+  redis-node-2:
+    image: redis-ssh:latest
+    container_name: redis-node-2
+    hostname: redis-node-2
+    ports:
+      - "2202:22"
+    networks:
+      redis-net:
+        ipv4_address: 10.10.0.12
+
+  redis-node-3:
+    image: redis-ssh:latest
+    container_name: redis-node-3
+    hostname: redis-node-3
+    ports:
+      - "2203:22"
+    networks:
+      redis-net:
+        ipv4_address: 10.10.0.13
+
+  redis-node-4:
+    image: redis-ssh:latest
+    container_name: redis-node-4
+    hostname: redis-node-4
+    ports:
+      - "2204:22"
+    networks:
+      redis-net:
+        ipv4_address: 10.10.0.14
+
+  redis-node-5:
+    image: redis-ssh:latest
+    container_name: redis-node-5
+    hostname: redis-node-5
+    ports:
+      - "2205:22"
+    networks:
+      redis-net:
+        ipv4_address: 10.10.0.15
+
+  redis-node-6:
+    image: redis-ssh:latest
+    container_name: redis-node-6
+    hostname: redis-node-6
+    ports:
+      - "2206:22"
+    networks:
+      redis-net:
+        ipv4_address: 10.10.0.16
+
+  # --- Spare nodes for scale-out (off by default; started by ./redis-tool scale) ---
+  redis-node-7:
+    image: redis-ssh:latest
+    container_name: redis-node-7
+    hostname: redis-node-7
+    profiles: ["scale"]
+    ports:
+      - "2207:22"
+    networks:
+      redis-net:
+        ipv4_address: 10.10.0.17
+
+  redis-node-8:
+    image: redis-ssh:latest
+    container_name: redis-node-8
+    hostname: redis-node-8
+    profiles: ["scale"]
+    ports:
+      - "2208:22"
+    networks:
+      redis-net:
+        ipv4_address: 10.10.0.18
+networks:
+  redis-net:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 10.10.0.0/24

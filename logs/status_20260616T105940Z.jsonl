@@ -1,0 +1,2 @@
+{"ts":"2026-06-16T10:59:40Z","command":"status","node":"","action":"command_start","outcome":"started","detail":"args: "}
+{"ts":"2026-06-16T10:59:40Z","command":"status","node":"","action":"command_end","outcome":"success","detail":"exit_code=0"}

@@ -1,0 +1,29 @@
+---
+# Provision Redis on a SINGLE node (used for scale-out).
+# Same as the normal provision, but WITHOUT create_cluster — the new node
+# starts standalone and is joined to the existing cluster later via redis-cli.
+- name: Provision Redis on a single node
+  hosts: "{{ target_host }}"
+  become: yes
+  vars:
+    redis_version: "{{ target_version }}"
+
+  tasks:
+    # Stop any Redis already running, so the freshly built binary becomes the
+    # running process (start.yml skips start if Redis is already up).
+    - name: Stop any running Redis
+      command: /usr/local/bin/redis-cli shutdown nosave
+      become_user: redis
+      failed_when: false
+      changed_when: false
+
+    - name: Wait for Redis to stop
+      wait_for:
+        port: 6379
+        state: stopped
+        timeout: 30
+      failed_when: false
+
+    - import_tasks: ../roles/redis/tasks/install.yml
+    - import_tasks: ../roles/redis/tasks/configure.yml
+    - import_tasks: ../roles/redis/tasks/start.yml

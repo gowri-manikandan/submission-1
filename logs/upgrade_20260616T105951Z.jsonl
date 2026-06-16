@@ -1,0 +1,19 @@
+{"ts":"2026-06-16T10:59:51Z","command":"upgrade","node":"","action":"command_start","outcome":"started","detail":"args: --target-version 7.2.6 --strategy rolling"}
+{"ts":"2026-06-16T10:59:59Z","command":"upgrade","node":"","action":"preflight","outcome":"passed","detail":"target=v7.2.6"}
+{"ts":"2026-06-16T10:59:59Z","command":"upgrade","node":"redis-node-4","action":"upgrade_replica","outcome":"running","detail":"ip=10.10.0.14 target=v7.2.6"}
+{"ts":"2026-06-16T11:01:56Z","command":"upgrade","node":"redis-node-4","action":"upgrade_replica","outcome":"success","detail":"ip=10.10.0.14 cluster=ok"}
+{"ts":"2026-06-16T11:01:56Z","command":"upgrade","node":"redis-node-5","action":"upgrade_replica","outcome":"running","detail":"ip=10.10.0.15 target=v7.2.6"}
+{"ts":"2026-06-16T11:04:04Z","command":"upgrade","node":"redis-node-5","action":"upgrade_replica","outcome":"success","detail":"ip=10.10.0.15 cluster=ok"}
+{"ts":"2026-06-16T11:04:04Z","command":"upgrade","node":"redis-node-6","action":"upgrade_replica","outcome":"running","detail":"ip=10.10.0.16 target=v7.2.6"}
+{"ts":"2026-06-16T11:06:11Z","command":"upgrade","node":"redis-node-6","action":"upgrade_replica","outcome":"success","detail":"ip=10.10.0.16 cluster=ok"}
+{"ts":"2026-06-16T11:06:11Z","command":"upgrade","node":"redis-node-2","action":"failover","outcome":"running","detail":"replica=10.10.0.16 promotes, master=10.10.0.12 demotes"}
+{"ts":"2026-06-16T11:06:15Z","command":"upgrade","node":"redis-node-2","action":"upgrade_master","outcome":"running","detail":"ip=10.10.0.12 target=v7.2.6"}
+{"ts":"2026-06-16T11:08:19Z","command":"upgrade","node":"redis-node-2","action":"upgrade_master","outcome":"success","detail":"ip=10.10.0.12 cluster=ok"}
+{"ts":"2026-06-16T11:08:19Z","command":"upgrade","node":"redis-node-1","action":"failover","outcome":"running","detail":"replica=10.10.0.15 promotes, master=10.10.0.11 demotes"}
+{"ts":"2026-06-16T11:08:21Z","command":"upgrade","node":"redis-node-1","action":"upgrade_master","outcome":"running","detail":"ip=10.10.0.11 target=v7.2.6"}
+{"ts":"2026-06-16T11:10:18Z","command":"upgrade","node":"redis-node-1","action":"upgrade_master","outcome":"success","detail":"ip=10.10.0.11 cluster=ok"}
+{"ts":"2026-06-16T11:10:18Z","command":"upgrade","node":"redis-node-3","action":"failover","outcome":"running","detail":"replica=10.10.0.14 promotes, master=10.10.0.13 demotes"}
+{"ts":"2026-06-16T11:10:20Z","command":"upgrade","node":"redis-node-3","action":"upgrade_master","outcome":"running","detail":"ip=10.10.0.13 target=v7.2.6"}
+{"ts":"2026-06-16T11:12:24Z","command":"upgrade","node":"redis-node-3","action":"upgrade_master","outcome":"success","detail":"ip=10.10.0.13 cluster=ok"}
+{"ts":"2026-06-16T11:12:30Z","command":"upgrade","node":"","action":"upgrade_complete","outcome":"success","detail":"all nodes on v7.2.6, data integrity verified"}
+{"ts":"2026-06-16T11:12:30Z","command":"upgrade","node":"","action":"command_end","outcome":"success","detail":"exit_code=0"}

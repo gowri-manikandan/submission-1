@@ -1,0 +1,547 @@
+#!/bin/bash
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ANSIBLE_DIR="$SCRIPT_DIR/ansible"
+
+# --- Structured logging (S5) ---
+LOG_DIR="$SCRIPT_DIR/logs"
+LOG_FILE=""
+CURRENT_CMD=""
+
+json_escape() {
+  local s="$1"
+  s="${s//\\/\\\\}"
+  s="${s//\"/\\\"}"
+  s="${s//$'\t'/ }"
+  s="${s//$'\n'/ }"
+  printf '%s' "$s"
+}
+
+init_logging() {
+  local cmd="$1"
+  mkdir -p "$LOG_DIR"
+  LOG_FILE="$LOG_DIR/${cmd}_$(date -u +%Y%m%dT%H%M%SZ).jsonl"
+}
+
+# log_event <action> <outcome> [node] [detail]
+log_event() {
+  [[ -z "$LOG_FILE" ]] && return 0
+  local action="$1" outcome="$2" node="${3:-}" detail="${4:-}"
+  printf '{"ts":"%s","command":"%s","node":"%s","action":"%s","outcome":"%s","detail":"%s"}\n' \
+    "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+    "$(json_escape "$CURRENT_CMD")" \
+    "$(json_escape "$node")" \
+    "$(json_escape "$action")" \
+    "$(json_escape "$outcome")" \
+    "$(json_escape "$detail")" \
+    >> "$LOG_FILE"
+}
+
+check_prerequisites() {
+  # 1. Container runtime (prefer Podman if both exist)
+  if command -v podman &>/dev/null; then
+    RUNTIME="podman"
+    COMPOSE_CMD="podman-compose"
+    echo "✓ Podman $(podman --version | awk '{print $3}') found"
+  elif command -v docker &>/dev/null; then
+    RUNTIME="docker"
+    COMPOSE_CMD="docker compose"
+    echo "✓ Docker $(docker --version | awk '{print $3}' | tr -d ',') found"
+  else
+    echo "✗ Container runtime not found (Docker or Podman)"
+    exit 1
+  fi
+
+    # 2. Ansible 2.14+
+  if ! command -v ansible-playbook &>/dev/null; then
+    echo "✗ Ansible not found — install: pip install ansible"
+    exit 1
+  fi
+  ansible_version=$(ansible --version 2>/dev/null | head -1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+')
+  if [[ -z "$ansible_version" ]] || \
+     [[ "$(printf '%s\n2.14.0\n' "$ansible_version" | sort -V | head -1)" != "2.14.0" ]]; then
+    echo "✗ Ansible 2.14+ required (found ${ansible_version:-none}) — install: pip install 'ansible>=2.14'"
+    exit 1
+  fi
+  echo "✓ Ansible $ansible_version found"
+}
+run_script_on_node1() {
+  local script_path="$1"
+  shift
+
+  ssh -i "$HOME/.ssh/id_rsa" \
+    -o StrictHostKeyChecking=no \
+    -p 2201 \
+    redis@127.0.0.1 \
+    "bash -s -- $*" < "$script_path"
+}
+cmd_provision() {
+  local version="7.0.15"
+  local masters=3
+  local replicas=1
+
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --version)              version="$2"; shift 2 ;;
+      --masters)              masters="$2"; shift 2 ;;
+      --replicas-per-master)  replicas="$2"; shift 2 ;;
+      *)
+        echo "Unknown option: $1"
+        exit 1
+        ;;
+    esac
+  done
+
+  echo "Provisioning Redis $version ($masters masters, $replicas replica(s) each)..."
+  log_event "provision" "running" "" "version=$version masters=$masters replicas=$replicas"
+
+  ansible-playbook \
+    -i "$ANSIBLE_DIR/inventory/hosts.ini" \
+    "$ANSIBLE_DIR/playbooks/provision.yml" \
+    -e "redis_version=$version" \
+    -e "cluster_masters=$masters" \
+    -e "cluster_replicas=$replicas"
+
+  log_event "provision" "success" "" "version=$version cluster ready"
+}
+
+cmd_data() {
+  local subcmd="${1:-}"
+  shift || true
+
+  case "$subcmd" in
+    seed)   cmd_data_seed "$@" ;;
+    verify) cmd_data_verify "$@" ;;
+    *) echo "Usage: ./redis-tool data {seed|verify}"; exit 1 ;;
+  esac
+}
+
+cmd_data_seed() {
+  local keys=1000
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --keys) keys="$2"; shift 2 ;;
+      *) echo "Unknown: $1"; exit 1 ;;
+    esac
+  done
+
+  run_script_on_node1 "$SCRIPT_DIR/scripts/seed_data.sh" "$keys"
+}
+cmd_data_verify() {
+  local keys=1000
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --keys) keys="$2"; shift 2 ;;
+      *) echo "Unknown: $1"; exit 1 ;;
+    esac
+  done
+
+  run_script_on_node1 "$SCRIPT_DIR/scripts/verify_data.sh" "$keys"
+ 
+}
+cmd_status() {
+  run_script_on_node1 "$SCRIPT_DIR/scripts/status.sh"
+}
+get_node_version() {
+  local port="$1"
+  ssh -i "$HOME/.ssh/id_rsa" -o StrictHostKeyChecking=no \
+    -p "$port" redis@127.0.0.1 \
+    "redis-cli INFO server" 2>/dev/null \
+    | grep '^redis_version:' | cut -d: -f2 | tr -d '[:space:]'
+}
+
+# Wait until SSH on a given local port is reachable (new containers take a moment)
+wait_for_ssh() {
+  local port="$1"
+  local i
+  for i in $(seq 1 30); do
+    if ssh -i "$HOME/.ssh/id_rsa" -o StrictHostKeyChecking=no -o ConnectTimeout=3 \
+         -p "$port" redis@127.0.0.1 "echo ok" &>/dev/null; then
+      return 0
+    fi
+    sleep 2
+  done
+  return 1
+}
+
+upgrade_one_node() {
+  local node="$1"       # e.g. redis-node-4
+  local ip="$2"         # e.g. 10.10.0.14
+  local step="$3"       # e.g. 1 (of 6 total steps)
+  local port="$4"       # SSH port e.g. 2204
+  local target_version="$5"
+
+  local current
+  current=$(get_node_version "$port")
+
+  if [[ "$current" == "$target_version" ]]; then
+    echo "[$step/6] Replica $ip already at v$target_version — skipping"
+    log_event "upgrade_replica" "skipped" "$node" "ip=$ip already at v$target_version"
+  else
+    echo "[$step/6] Upgrading replica $node ($ip)..."
+    log_event "upgrade_replica" "running" "$node" "ip=$ip target=v$target_version"
+    if ! ansible-playbook \
+      -i "$ANSIBLE_DIR/inventory/hosts.ini" \
+      "$ANSIBLE_DIR/playbooks/upgrade_node.yml" \
+      -e "target_host=$node" \
+      -e "target_version=$target_version"; then
+      log_event "upgrade_replica" "failed" "$node" "ip=$ip ansible playbook failed"
+      exit 1
+    fi
+  fi
+
+  local cluster_state
+  cluster_state=$(run_script_on_node1 "$SCRIPT_DIR/scripts/wait_cluster_ok.sh")
+  if [[ "$cluster_state" != "cluster: ok" ]]; then
+    echo "FAIL: cluster not ok after upgrading $ip"
+    log_event "upgrade_replica" "failed" "$node" "ip=$ip cluster not ok after upgrade"
+    exit 1
+  fi
+  echo "[$step/6] Upgraded replica $ip — $cluster_state"
+  log_event "upgrade_replica" "success" "$node" "ip=$ip cluster=ok"
+}
+upgrade_master_with_failover() {
+  local master_node="$1"
+  local master_ip="$2"
+  local replica_ip="$3"
+  local step="$4"
+  local target_version="$5"
+
+  echo "[$step/6] Failover: replica $replica_ip promotes, master $master_ip becomes replica"
+  log_event "failover" "running" "$master_node" "replica=$replica_ip promotes, master=$master_ip demotes"
+  run_script_on_node1 "$SCRIPT_DIR/scripts/trigger_failover.sh" "$replica_ip" "$master_ip"
+
+  echo "[$step/6] Upgrading old master $master_node ($master_ip)..."
+  log_event "upgrade_master" "running" "$master_node" "ip=$master_ip target=v$target_version"
+  if ! ansible-playbook \
+    -i "$ANSIBLE_DIR/inventory/hosts.ini" \
+    "$ANSIBLE_DIR/playbooks/upgrade_node.yml" \
+    -e "target_host=$master_node" \
+    -e "target_version=$target_version"; then
+    log_event "upgrade_master" "failed" "$master_node" "ip=$master_ip ansible playbook failed"
+    exit 1
+  fi
+
+  local cluster_state
+  cluster_state=$(run_script_on_node1 "$SCRIPT_DIR/scripts/wait_cluster_ok.sh")
+  if [[ "$cluster_state" != "cluster: ok" ]]; then
+    echo "FAIL: cluster not ok after upgrading $master_ip"
+    log_event "upgrade_master" "failed" "$master_node" "ip=$master_ip cluster not ok after upgrade"
+    exit 1
+  fi
+  echo "[$step/6] Upgraded master $master_ip — $cluster_state"
+  log_event "upgrade_master" "success" "$master_node" "ip=$master_ip cluster=ok"
+}
+ip_to_node() {
+  case "$1" in
+    10.10.0.11) echo "redis-node-1" ;;
+    10.10.0.12) echo "redis-node-2" ;;
+    10.10.0.13) echo "redis-node-3" ;;
+    10.10.0.14) echo "redis-node-4" ;;
+    10.10.0.15) echo "redis-node-5" ;;
+    10.10.0.16) echo "redis-node-6" ;;
+    *) echo "" ;;
+  esac
+}
+
+get_master_replica_pairs() {
+  run_script_on_node1 "$SCRIPT_DIR/scripts/get_master_replica_pairs.sh"
+}
+cmd_upgrade() {
+  local target_version=""
+  local strategy="rolling"
+
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --target-version) target_version="$2"; shift 2 ;;
+      --strategy)       strategy="$2"; shift 2 ;;
+      *)
+        echo "Unknown option: $1"
+        exit 1
+        ;;
+    esac
+  done
+
+  if [[ -z "$target_version" ]]; then
+    echo "Error: --target-version is required"
+    echo "Usage: ./redis-tool upgrade --target-version 7.2.6 --strategy rolling"
+    exit 1
+  fi
+
+  if [[ "$strategy" != "rolling" ]]; then
+    echo "Error: only --strategy rolling is supported"
+    exit 1
+  fi
+
+  # --- Pre-flight ---
+  echo "=== Rolling upgrade pre-flight ==="
+  set +e
+  run_script_on_node1 "$SCRIPT_DIR/scripts/preflight_upgrade.sh" "$target_version"
+  local preflight_rc=$?
+  set -e
+
+  if [[ "$preflight_rc" -eq 10 ]]; then
+    echo "Already on v$target_version — nothing to do."
+    log_event "preflight" "skipped" "" "all nodes already at v$target_version"
+    exit 0
+  elif [[ "$preflight_rc" -ne 0 ]]; then
+    echo "FAIL: pre-flight checks failed"
+    log_event "preflight" "failed" "" "pre-flight checks failed (rc=$preflight_rc)"
+    exit 1
+  fi
+  log_event "preflight" "passed" "" "target=v$target_version"
+
+  # --- Replicas first (steps 1-3) ---
+  echo ""
+  echo "=== Upgrading replicas ==="
+  upgrade_one_node "redis-node-4" "10.10.0.14" 1 2204 "$target_version"
+  upgrade_one_node "redis-node-5" "10.10.0.15" 2 2205 "$target_version"
+  upgrade_one_node "redis-node-6" "10.10.0.16" 3 2206 "$target_version"
+
+  # --- Masters with failover (steps 4-6) — dynamic pairs only ---
+  echo ""
+  echo "=== Upgrading masters with failover ==="
+
+  local step=3
+  while IFS= read -r pair; do
+    [[ -z "$pair" ]] && continue
+    local master_ip replica_ip master_node
+    master_ip=$(awk '{print $1}' <<< "$pair")
+    replica_ip=$(awk '{print $2}' <<< "$pair")
+    master_node=$(ip_to_node "$master_ip")
+
+    if [[ -z "$master_node" ]]; then
+      echo "FAIL: no ansible host for master IP $master_ip"
+      exit 1
+    fi
+
+    step=$((step + 1))
+    upgrade_master_with_failover "$master_node" "$master_ip" "$replica_ip" "$step" "$target_version"
+  done < <(get_master_replica_pairs)
+
+  # --- Post-upgrade verification ---
+  echo ""
+  echo "=== Post-upgrade verification ==="
+  cmd_data_verify --keys 1000
+  echo ""
+  cmd_status
+
+  echo ""
+  echo "UPGRADE COMPLETE — all nodes on v$target_version, data integrity verified"
+  log_event "upgrade_complete" "success" "" "all nodes on v$target_version, data integrity verified"
+}
+
+cmd_verify() {
+  local full=false
+  local keys=1000
+  local target_version=""
+
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --full)           full=true; shift ;;
+      --keys)           keys="$2"; shift 2 ;;
+      --target-version) target_version="$2"; shift 2 ;;
+      *)
+        echo "Unknown option: $1"
+        exit 1
+        ;;
+    esac
+  done
+
+  if [[ "$full" != true ]]; then
+    echo "Usage: ./redis-tool verify --full [--keys 1000] [--target-version 7.2.6]"
+    exit 1
+  fi
+
+  run_script_on_node1 "$SCRIPT_DIR/scripts/verify_full.sh" "$keys" "$target_version"
+}
+
+# Scale OUT: add 1 new master (10.10.0.17) + 1 new replica (10.10.0.18) using the spare nodes.
+cmd_scale_out() {
+  echo "=== Scale out: adding master 10.10.0.17 + replica 10.10.0.18 ==="
+  log_event "scale_out" "running" "" "add master=10.10.0.17 replica=10.10.0.18"
+
+  # 1. Match the new nodes to the cluster's current version
+  local ver
+  ver=$(get_node_version 2201)
+  if [[ -z "$ver" ]]; then
+    echo "FAIL: could not read the cluster's Redis version (is the cluster up?)"
+    exit 1
+  fi
+  echo "Cluster is on v$ver - new nodes will be built to match."
+
+  # 2. Bring up the spare containers (profile 'scale')
+  echo "Starting spare containers redis-node-7, redis-node-8..."
+  ( cd "$SCRIPT_DIR/infra" && $COMPOSE_CMD --profile scale up -d redis-node-7 redis-node-8 )
+
+  # 3. Wait for SSH on both spares
+  local p
+  for p in 2207 2208; do
+    echo "Waiting for SSH on port $p..."
+    if ! wait_for_ssh "$p"; then
+      echo "FAIL: SSH not ready on port $p"
+      exit 1
+    fi
+  done
+
+  # 4. Install Redis on the new nodes at the cluster version (no cluster creation)
+  local node
+  for node in redis-node-7 redis-node-8; do
+    echo "Provisioning Redis $ver on $node..."
+    ansible-playbook \
+      -i "$ANSIBLE_DIR/inventory/hosts.ini" \
+      "$ANSIBLE_DIR/playbooks/provision_node.yml" \
+      -e "target_host=$node" \
+      -e "target_version=$ver"
+  done
+
+  # 5. Join them to the cluster and rebalance slots (runs on node-1)
+  run_script_on_node1 "$SCRIPT_DIR/scripts/scale_out.sh" "10.10.0.17" "10.10.0.18"
+
+  # 6. Verify the cluster is healthy
+  local cluster_state
+  cluster_state=$(run_script_on_node1 "$SCRIPT_DIR/scripts/wait_cluster_ok.sh")
+  if [[ "$cluster_state" != "cluster: ok" ]]; then
+    echo "FAIL: cluster not ok after scale-out"
+    log_event "scale_out" "failed" "" "cluster not ok after scale-out"
+    exit 1
+  fi
+
+  echo ""
+  echo "SCALE-OUT COMPLETE - added master 10.10.0.17 + replica 10.10.0.18"
+  log_event "scale_out" "success" "" "master=10.10.0.17 replica=10.10.0.18 cluster=ok"
+  echo ""
+  cmd_status
+}
+
+cmd_scale() {
+  local add_nodes=0
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --add-nodes) add_nodes="$2"; shift 2 ;;
+      *) echo "Unknown option: $1"; exit 1 ;;
+    esac
+  done
+
+  if [[ "$add_nodes" == "2" ]]; then
+    cmd_scale_out
+  else
+    echo "Error: only --add-nodes 2 is supported (adds one master + one replica using the 2 spare nodes)"
+    echo "Usage: ./redis-tool scale --add-nodes 2"
+    exit 1
+  fi
+}
+
+# Roll back ONE node to the target (older) version: stop -> install old -> wipe data -> start.
+# Skips nodes already on the target version. The node (a replica) re-syncs clean from its master.
+rollback_one_node() {
+  local node="$1" ip="$2" port="$3" target_version="$4"
+  local current
+  current=$(get_node_version "$port")
+
+  if [[ "$current" == "$target_version" ]]; then
+    echo "  $ip already at v$target_version — skipping"
+    return 0
+  fi
+
+  echo "  Rolling back $node ($ip): v$current -> v$target_version (wipe + re-sync)..."
+  log_event "rollback_node" "running" "$node" "ip=$ip $current->$target_version"
+  if ! ansible-playbook \
+    -i "$ANSIBLE_DIR/inventory/hosts.ini" \
+    "$ANSIBLE_DIR/playbooks/upgrade_node.yml" \
+    -e "target_host=$node" \
+    -e "target_version=$target_version" \
+    -e "wipe_data=true"; then
+    echo "FAIL: rollback playbook failed on $node"
+    log_event "rollback_node" "failed" "$node" "ip=$ip playbook failed"
+    exit 1
+  fi
+
+  local cs
+  cs=$(run_script_on_node1 "$SCRIPT_DIR/scripts/wait_cluster_ok.sh")
+  if [[ "$cs" != "cluster: ok" ]]; then
+    echo "FAIL: cluster not ok after rolling back $ip"
+    log_event "rollback_node" "failed" "$node" "ip=$ip cluster not ok"
+    exit 1
+  fi
+  echo "  $ip rolled back to v$target_version — $cs"
+  log_event "rollback_node" "success" "$node" "ip=$ip cluster=ok"
+}
+
+cmd_rollback() {
+  local target_version=""
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --target-version) target_version="$2"; shift 2 ;;
+      *) echo "Unknown option: $1"; exit 1 ;;
+    esac
+  done
+
+  if [[ -z "$target_version" ]]; then
+    echo "Error: --target-version is required"
+    echo "Usage: ./redis-tool rollback --target-version 7.0.15"
+    exit 1
+  fi
+
+  echo "=== Rollback to v$target_version ==="
+  echo "(downgrades nodes that are ahead of v$target_version; each is wiped and"
+  echo " re-syncs from a surviving old-version master — for a partial/aborted upgrade)"
+  log_event "rollback" "running" "" "target=v$target_version"
+
+  # Cluster must be healthy before we start
+  local cs
+  cs=$(run_script_on_node1 "$SCRIPT_DIR/scripts/wait_cluster_ok.sh")
+  if [[ "$cs" != "cluster: ok" ]]; then
+    echo "FAIL: cluster not ok — cannot roll back"
+    log_event "rollback" "failed" "" "cluster not ok at start"
+    exit 1
+  fi
+
+  # Replicas first, then the old master positions (same safe order as upgrade).
+  echo ""
+  echo "=== Rolling back nodes not on v$target_version ==="
+  rollback_one_node "redis-node-4" "10.10.0.14" 2204 "$target_version"
+  rollback_one_node "redis-node-5" "10.10.0.15" 2205 "$target_version"
+  rollback_one_node "redis-node-6" "10.10.0.16" 2206 "$target_version"
+  rollback_one_node "redis-node-1" "10.10.0.11" 2201 "$target_version"
+  rollback_one_node "redis-node-2" "10.10.0.12" 2202 "$target_version"
+  rollback_one_node "redis-node-3" "10.10.0.13" 2203 "$target_version"
+
+  echo ""
+  echo "=== Post-rollback verification ==="
+  cmd_data_verify --keys 1000
+  echo ""
+  cmd_status
+
+  echo ""
+  echo "ROLLBACK COMPLETE — upgraded nodes returned to v$target_version"
+  log_event "rollback" "success" "" "target=v$target_version"
+}
+main()
+{
+	check_prerequisites    # ← add this line
+  local cmd="${1:-}"
+  shift || true
+
+  CURRENT_CMD="${cmd:-unknown}"
+  init_logging "$CURRENT_CMD"
+  log_event "command_start" "started" "" "args: $*"
+  trap 'rc=$?; log_event "command_end" "$([[ $rc -eq 0 ]] && echo success || echo failure)" "" "exit_code=$rc"' EXIT
+
+  case "$cmd" in
+    provision)  cmd_provision "$@" ;;
+    data)       cmd_data "$@" ;;
+    status)     cmd_status "$@" ;;
+    upgrade)    cmd_upgrade "$@" ;;
+    rollback)   cmd_rollback "$@" ;;
+    verify)     cmd_verify "$@" ;;
+    scale)      cmd_scale "$@" ;;
+    *)
+      echo "Usage: ./redis-tool {provision|data|status|upgrade|rollback|verify|scale}"
+      exit 1
+      ;;
+  esac
+}
+
+main "$@"

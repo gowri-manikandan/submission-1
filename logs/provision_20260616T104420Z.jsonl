@@ -1,0 +1,3 @@
+{"ts":"2026-06-16T10:44:20Z","command":"provision","node":"","action":"command_start","outcome":"started","detail":"args: --version 7.0.15 --masters 3 --replicas-per-master 1"}
+{"ts":"2026-06-16T10:44:20Z","command":"provision","node":"","action":"provision","outcome":"running","detail":"version=7.0.15 masters=3 replicas=1"}
+{"ts":"2026-06-16T10:49:29Z","command":"provision","node":"","action":"command_end","outcome":"failure","detail":"exit_code=99"}

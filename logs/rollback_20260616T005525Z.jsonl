@@ -1,0 +1,5 @@
+{"ts":"2026-06-16T00:55:25Z","command":"rollback","node":"","action":"command_start","outcome":"started","detail":"args: --target-version 7.0.15"}
+{"ts":"2026-06-16T00:55:25Z","command":"rollback","node":"","action":"rollback","outcome":"running","detail":"target=v7.0.15"}
+{"ts":"2026-06-16T00:55:29Z","command":"rollback","node":"","action":"preflight","outcome":"passed","detail":"target=v7.0.15"}
+{"ts":"2026-06-16T00:55:29Z","command":"rollback","node":"redis-node-4","action":"upgrade_replica","outcome":"running","detail":"ip=10.10.0.14 target=v7.0.15"}
+{"ts":"2026-06-16T00:57:28Z","command":"rollback","node":"","action":"command_end","outcome":"failure","detail":"exit_code=2"}

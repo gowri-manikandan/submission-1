@@ -1,0 +1,10 @@
+---
+- name: Provision Redis Cluster Nodes
+  hosts: redis_nodes
+  become: yes
+
+  tasks:
+    - import_tasks: ../roles/redis/tasks/install.yml
+    - import_tasks: ../roles/redis/tasks/configure.yml
+    - import_tasks: ../roles/redis/tasks/start.yml
+    - import_tasks: ../roles/redis/tasks/create_cluster.yml

@@ -1,0 +1,10 @@
+{"ts":"2026-06-16T12:31:04Z","command":"rollback","node":"","action":"command_start","outcome":"started","detail":"args: --target-version 7.0.15"}
+{"ts":"2026-06-16T12:31:04Z","command":"rollback","node":"","action":"rollback","outcome":"running","detail":"target=v7.0.15"}
+{"ts":"2026-06-16T12:31:05Z","command":"rollback","node":"redis-node-4","action":"rollback_node","outcome":"running","detail":"ip=10.10.0.14 7.2.6->7.0.15"}
+{"ts":"2026-06-16T12:32:22Z","command":"rollback","node":"redis-node-4","action":"rollback_node","outcome":"success","detail":"ip=10.10.0.14 cluster=ok"}
+{"ts":"2026-06-16T12:32:22Z","command":"rollback","node":"redis-node-5","action":"rollback_node","outcome":"running","detail":"ip=10.10.0.15 7.2.6->7.0.15"}
+{"ts":"2026-06-16T12:33:36Z","command":"rollback","node":"redis-node-5","action":"rollback_node","outcome":"success","detail":"ip=10.10.0.15 cluster=ok"}
+{"ts":"2026-06-16T12:33:36Z","command":"rollback","node":"redis-node-6","action":"rollback_node","outcome":"running","detail":"ip=10.10.0.16 7.2.6->7.0.15"}
+{"ts":"2026-06-16T12:34:51Z","command":"rollback","node":"redis-node-6","action":"rollback_node","outcome":"success","detail":"ip=10.10.0.16 cluster=ok"}
+{"ts":"2026-06-16T12:34:57Z","command":"rollback","node":"","action":"rollback","outcome":"success","detail":"target=v7.0.15"}
+{"ts":"2026-06-16T12:34:57Z","command":"rollback","node":"","action":"command_end","outcome":"success","detail":"exit_code=0"}

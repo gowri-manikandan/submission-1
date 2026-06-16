@@ -1,0 +1,26 @@
+---
+- name: Check if cluster already exists
+  command: redis-cli cluster info
+  register: cluster_info
+  failed_when: false
+  changed_when: false
+- name: Report cluster already provisioned
+  debug:
+    msg: "Cluster already exists and is healthy — skipping creation"
+  when: "'cluster_state:ok' in cluster_info.stdout"
+  run_once: true
+
+- name: Create Redis cluster
+  command: >
+    redis-cli --cluster create
+    10.10.0.11:6379
+    10.10.0.12:6379
+    10.10.0.13:6379
+    10.10.0.14:6379
+    10.10.0.15:6379
+    10.10.0.16:6379
+    --cluster-replicas 1
+    --cluster-yes
+  when: "'cluster_state:ok' not in cluster_info.stdout"
+  run_once: true
+  delegate_to: redis-node-1

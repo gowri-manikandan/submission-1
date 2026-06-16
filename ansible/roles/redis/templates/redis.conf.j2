@@ -1,0 +1,17 @@
+bind 0.0.0.0
+port 6379
+
+protected-mode no
+
+cluster-enabled yes
+cluster-config-file nodes.conf
+cluster-node-timeout 5000
+
+appendonly yes
+
+daemonize yes
+dir /var/lib/redis
+logfile /var/log/redis/redis-server.log
+cluster-announce-ip {{ redis_cluster_ip }}
+cluster-announce-port 6379
+cluster-announce-bus-port 16379

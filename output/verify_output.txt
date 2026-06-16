@@ -1,0 +1,16 @@
+✓ Docker 29.5.3 found
+✓ Ansible 2.20.1 found
+=== Full Verification ===
+
+[1/5] Data integrity
+  PASS — 1000/1000 keys verified
+[2/5] Version consistency
+  PASS — all nodes on v7.2.6
+[3/5] Topology health
+  PASS — 16384 slots assigned, every master has a replica
+[4/5] Cluster state
+  PASS — cluster_state=ok
+[5/5] Replication health
+  PASS — all replicas master_link_status=up
+
+OVERALL: PASS — all 5 checks passed

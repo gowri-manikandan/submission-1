@@ -1,0 +1,191 @@
+✓ Docker 29.5.3 found
+✓ Ansible 2.20.1 found
+Provisioning Redis 7.0.15 (3 masters, 1 replica(s) each)...
+
+PLAY [Provision Redis Cluster Nodes] *******************************************
+
+TASK [Gathering Facts] *********************************************************
+ok: [redis-node-4]
+ok: [redis-node-5]
+ok: [redis-node-3]
+ok: [redis-node-1]
+ok: [redis-node-2]
+ok: [redis-node-6]
+
+TASK [Set default Redis version] ***********************************************
+ok: [redis-node-2]
+ok: [redis-node-1]
+ok: [redis-node-3]
+ok: [redis-node-4]
+ok: [redis-node-5]
+ok: [redis-node-6]
+
+TASK [Install build dependencies] **********************************************
+changed: [redis-node-3]
+changed: [redis-node-4]
+changed: [redis-node-5]
+changed: [redis-node-2]
+changed: [redis-node-1]
+changed: [redis-node-6]
+
+TASK [Remove apt Redis packages (avoid wrong version in /usr/bin)] *************
+ok: [redis-node-3]
+ok: [redis-node-1]
+ok: [redis-node-5]
+ok: [redis-node-4]
+ok: [redis-node-2]
+ok: [redis-node-6]
+
+TASK [Check current Redis binary version] **************************************
+ok: [redis-node-5]
+ok: [redis-node-2]
+ok: [redis-node-3]
+ok: [redis-node-4]
+ok: [redis-node-1]
+ok: [redis-node-6]
+
+TASK [Download Redis 7.0.15 source] ********************************************
+changed: [redis-node-4]
+changed: [redis-node-2]
+changed: [redis-node-1]
+changed: [redis-node-6]
+changed: [redis-node-3]
+changed: [redis-node-5]
+
+TASK [Build and install Redis 7.0.15] ******************************************
+changed: [redis-node-4]
+changed: [redis-node-5]
+changed: [redis-node-3]
+changed: [redis-node-2]
+changed: [redis-node-1]
+changed: [redis-node-6]
+
+TASK [Verify installed Redis version] ******************************************
+ok: [redis-node-1]
+ok: [redis-node-2]
+ok: [redis-node-4]
+ok: [redis-node-3]
+ok: [redis-node-5]
+ok: [redis-node-6]
+
+TASK [Confirm target version installed] ****************************************
+ok: [redis-node-1] => {
+    "changed": false,
+    "msg": "All assertions passed"
+}
+ok: [redis-node-2] => {
+    "changed": false,
+    "msg": "All assertions passed"
+}
+ok: [redis-node-3] => {
+    "changed": false,
+    "msg": "All assertions passed"
+}
+ok: [redis-node-4] => {
+    "changed": false,
+    "msg": "All assertions passed"
+}
+ok: [redis-node-5] => {
+    "changed": false,
+    "msg": "All assertions passed"
+}
+ok: [redis-node-6] => {
+    "changed": false,
+    "msg": "All assertions passed"
+}
+
+TASK [Show installed version] **************************************************
+ok: [redis-node-1] => {
+    "msg": "Redis server v=7.0.15 sha=00000000:0 malloc=jemalloc-5.2.1 bits=64 build=244ef20d956d7b0d"
+}
+ok: [redis-node-2] => {
+    "msg": "Redis server v=7.0.15 sha=00000000:0 malloc=jemalloc-5.2.1 bits=64 build=5f1d4534144920ea"
+}
+ok: [redis-node-3] => {
+    "msg": "Redis server v=7.0.15 sha=00000000:0 malloc=jemalloc-5.2.1 bits=64 build=90e4ca125cd8676e"
+}
+ok: [redis-node-4] => {
+    "msg": "Redis server v=7.0.15 sha=00000000:0 malloc=jemalloc-5.2.1 bits=64 build=a9ba2b4716019724"
+}
+ok: [redis-node-5] => {
+    "msg": "Redis server v=7.0.15 sha=00000000:0 malloc=jemalloc-5.2.1 bits=64 build=6643a4615e90d0a0"
+}
+ok: [redis-node-6] => {
+    "msg": "Redis server v=7.0.15 sha=00000000:0 malloc=jemalloc-5.2.1 bits=64 build=fafa0f60505b72b2"
+}
+
+TASK [Ensure Redis config directory exists] ************************************
+changed: [redis-node-1]
+changed: [redis-node-2]
+changed: [redis-node-3]
+changed: [redis-node-4]
+changed: [redis-node-5]
+changed: [redis-node-6]
+
+TASK [Copy Redis config] *******************************************************
+changed: [redis-node-3]
+changed: [redis-node-5]
+changed: [redis-node-4]
+changed: [redis-node-1]
+changed: [redis-node-2]
+changed: [redis-node-6]
+
+TASK [Ensure Redis data directory exists] **************************************
+changed: [redis-node-1]
+changed: [redis-node-2]
+changed: [redis-node-4]
+changed: [redis-node-3]
+changed: [redis-node-5]
+changed: [redis-node-6]
+
+TASK [Ensure Redis log directory exists] ***************************************
+changed: [redis-node-1]
+changed: [redis-node-2]
+changed: [redis-node-3]
+changed: [redis-node-4]
+changed: [redis-node-5]
+changed: [redis-node-6]
+
+TASK [Check if Redis is already running] ***************************************
+ok: [redis-node-1]
+ok: [redis-node-2]
+ok: [redis-node-3]
+ok: [redis-node-4]
+ok: [redis-node-5]
+ok: [redis-node-6]
+
+TASK [Start Redis] *************************************************************
+changed: [redis-node-1]
+changed: [redis-node-3]
+changed: [redis-node-2]
+changed: [redis-node-4]
+changed: [redis-node-5]
+changed: [redis-node-6]
+
+TASK [Wait for Redis to respond] ***********************************************
+ok: [redis-node-1]
+ok: [redis-node-2]
+ok: [redis-node-3]
+ok: [redis-node-4]
+ok: [redis-node-5]
+ok: [redis-node-6]
+
+TASK [Check if cluster already exists] *****************************************
+ok: [redis-node-1]
+ok: [redis-node-2]
+ok: [redis-node-3]
+ok: [redis-node-4]
+ok: [redis-node-5]
+ok: [redis-node-6]
+
+TASK [Create Redis cluster] ****************************************************
+changed: [redis-node-1]
+
+PLAY RECAP *********************************************************************
+redis-node-1               : ok=19   changed=9    unreachable=0    failed=0    skipped=0    rescued=0    ignored=0   
+redis-node-2               : ok=18   changed=8    unreachable=0    failed=0    skipped=0    rescued=0    ignored=0   
+redis-node-3               : ok=18   changed=8    unreachable=0    failed=0    skipped=0    rescued=0    ignored=0   
+redis-node-4               : ok=18   changed=8    unreachable=0    failed=0    skipped=0    rescued=0    ignored=0   
+redis-node-5               : ok=18   changed=8    unreachable=0    failed=0    skipped=0    rescued=0    ignored=0   
+redis-node-6               : ok=18   changed=8    unreachable=0    failed=0    skipped=0    rescued=0    ignored=0   
+

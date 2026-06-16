@@ -1,0 +1,37 @@
+---
+- name: Ensure Redis data directory exists
+  file:
+    path: /var/lib/redis
+    state: directory
+    owner: redis
+    group: redis
+    mode: '0755'
+
+- name: Ensure Redis log directory exists
+  file:
+    path: /var/log/redis
+    state: directory
+    owner: redis
+    group: redis
+    mode: '0755'
+
+- name: Check if Redis is already running
+  command: /usr/local/bin/redis-cli ping
+  register: redis_ping
+  failed_when: false
+  changed_when: false
+  become_user: redis
+
+- name: Start Redis
+  command: /usr/local/bin/redis-server /etc/redis/redis.conf
+  when: redis_ping.stdout != "PONG"
+  become_user: redis
+
+- name: Wait for Redis to respond
+  command: /usr/local/bin/redis-cli ping
+  register: redis_ping_final
+  until: redis_ping_final.stdout == "PONG"
+  retries: 10
+  delay: 2
+  become_user: redis
+  changed_when: false

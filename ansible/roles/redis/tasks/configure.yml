@@ -1,0 +1,16 @@
+---
+- name: Ensure Redis config directory exists
+  file:
+    path: /etc/redis
+    state: directory
+    owner: redis
+    group: redis
+    mode: '0755'
+
+- name: Copy Redis config
+  template:
+    src: ../templates/redis.conf.j2
+    dest: /etc/redis/redis.conf
+    owner: redis
+    group: redis
+    mode: '0644'

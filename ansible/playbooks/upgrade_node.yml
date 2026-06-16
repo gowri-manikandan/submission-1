@@ -1,0 +1,40 @@
+---
+- name: Upgrade Redis on a single node
+  hosts: "{{ target_host }}"
+  become: yes
+  vars:
+    redis_version: "{{ target_version }}"
+
+  tasks:
+    - name: Stop Redis gracefully
+      command: /usr/local/bin/redis-cli shutdown nosave
+      become_user: redis
+      failed_when: false
+
+    - name: Wait for Redis to stop
+      wait_for:
+        port: 6379
+        state: stopped
+        timeout: 30
+      failed_when: false
+
+    - import_tasks: ../roles/redis/tasks/upgrade_install.yml
+
+    # Only during rollback (wipe_data=true): delete the data files so the OLDER
+    # Redis doesn't choke on a newer-format RDB/AOF. nodes.conf is kept, so the
+    # node keeps its cluster identity and re-syncs fresh from its master.
+    - name: Wipe data dir for downgrade (keep cluster identity)
+      shell: rm -f /var/lib/redis/dump.rdb && rm -rf /var/lib/redis/appendonlydir
+      become_user: redis
+      when: wipe_data | default(false) | bool
+
+    - name: Start Redis with existing config
+      command: /usr/local/bin/redis-server /etc/redis/redis.conf
+      become_user: redis
+    - name: Check Redis is running
+      command: /usr/local/bin/redis-cli ping
+      register: redis_ping
+      until: redis_ping.stdout == "PONG"
+      retries: 15
+      delay: 2
+      become_user: redis

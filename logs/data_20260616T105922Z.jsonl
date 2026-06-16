@@ -1,0 +1,2 @@
+{"ts":"2026-06-16T10:59:22Z","command":"data","node":"","action":"command_start","outcome":"started","detail":"args: verify"}
+{"ts":"2026-06-16T10:59:28Z","command":"data","node":"","action":"command_end","outcome":"success","detail":"exit_code=0"}

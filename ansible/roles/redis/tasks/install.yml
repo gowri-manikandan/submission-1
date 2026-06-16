@@ -1,0 +1,61 @@
+---
+- name: Set default Redis version
+  set_fact:
+    redis_version: "{{ redis_version | default('7.0.15') }}"
+
+- name: Install build dependencies
+  apt:
+    name:
+      - build-essential
+      - tcl
+      - wget
+      - tar
+      - gzip
+    state: present
+    update_cache: yes
+
+- name: Remove apt Redis packages (avoid wrong version in /usr/bin)
+  apt:
+    name:
+      - redis-server
+      - redis-tools
+    state: absent
+
+- name: Check current Redis binary version
+  command: /usr/local/bin/redis-server --version
+  register: current_redis_version
+  failed_when: false
+  changed_when: false
+
+- name: Download Redis {{ redis_version }} source
+  get_url:
+    url: "https://download.redis.io/releases/redis-{{ redis_version }}.tar.gz"
+    dest: "/tmp/redis-{{ redis_version }}.tar.gz"
+    mode: '0644'
+    force: yes
+  when: redis_version not in current_redis_version.stdout
+
+- name: Build and install Redis {{ redis_version }}
+  shell: |
+    set -e
+    rm -rf /tmp/redis-{{ redis_version }}
+    tar xzf /tmp/redis-{{ redis_version }}.tar.gz -C /tmp
+    cd /tmp/redis-{{ redis_version }}
+    make -j"$(nproc)"
+    make install PREFIX=/usr/local
+  when: redis_version not in current_redis_version.stdout
+
+- name: Verify installed Redis version
+  command: /usr/local/bin/redis-server --version
+  register: redis_installed_version
+  changed_when: false
+
+- name: Confirm target version installed
+  assert:
+    that:
+      - redis_version in redis_installed_version.stdout
+    fail_msg: "Expected Redis {{ redis_version }}, got {{ redis_installed_version.stdout }}"
+
+- name: Show installed version
+  debug:
+    msg: "{{ redis_installed_version.stdout }}"
