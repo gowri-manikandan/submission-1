@@ -1,3 +1,0 @@
-{"ts":"2026-06-16T00:24:35Z","command":"upgrade","node":"","action":"command_start","outcome":"started","detail":"args: --target-version 7.2.6 --strategy rolling"}
-{"ts":"2026-06-16T00:24:35Z","command":"upgrade","node":"","action":"preflight","outcome":"skipped","detail":"all nodes already at v7.2.6"}
-{"ts":"2026-06-16T00:24:35Z","command":"upgrade","node":"","action":"command_end","outcome":"success","detail":"exit_code=0"}

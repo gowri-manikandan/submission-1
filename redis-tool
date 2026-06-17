@@ -22,9 +22,10 @@ json_escape() {
 }
 
 init_logging() {
-  local cmd="$1"
+  # All commands append to ONE rolling log file. Each line records its own
+  # command name (CURRENT_CMD) and timestamp, so a single file stays unambiguous.
   mkdir -p "$LOG_DIR"
-  LOG_FILE="$LOG_DIR/${cmd}_$(date -u +%Y%m%dT%H%M%SZ).jsonl"
+  LOG_FILE="$LOG_DIR/redis-tool.jsonl"
 }
 
 # log_event <action> <outcome> [node] [detail]
@@ -75,6 +76,8 @@ run_script_on_node1() {
 
   ssh -i "$HOME/.ssh/id_rsa" \
     -o StrictHostKeyChecking=no \
+    -o UserKnownHostsFile=/dev/null \
+    -o LogLevel=ERROR \
     -p 2201 \
     redis@127.0.0.1 \
     "bash -s -- $*" < "$script_path"
@@ -148,7 +151,7 @@ cmd_status() {
 }
 get_node_version() {
   local port="$1"
-  ssh -i "$HOME/.ssh/id_rsa" -o StrictHostKeyChecking=no \
+  ssh -i "$HOME/.ssh/id_rsa" -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR \
     -p "$port" redis@127.0.0.1 \
     "redis-cli INFO server" 2>/dev/null \
     | grep '^redis_version:' | cut -d: -f2 | tr -d '[:space:]'
@@ -159,7 +162,7 @@ wait_for_ssh() {
   local port="$1"
   local i
   for i in $(seq 1 30); do
-    if ssh -i "$HOME/.ssh/id_rsa" -o StrictHostKeyChecking=no -o ConnectTimeout=3 \
+    if ssh -i "$HOME/.ssh/id_rsa" -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR -o ConnectTimeout=3 \
          -p "$port" redis@127.0.0.1 "echo ok" &>/dev/null; then
       return 0
     fi

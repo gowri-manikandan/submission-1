@@ -45,10 +45,40 @@ if [[ "$ok" != "1" ]]; then
   exit 1
 fi
 
+# A freshly-joined node briefly sees the cluster as "down" until gossip converges,
+# which makes slot migration fail with CLUSTERDOWN. Wait for it to settle first.
+echo "Waiting for $NEW_MASTER_IP to see cluster_state:ok..."
+for i in $(seq 1 30); do
+  st=$(redis-cli -h "$NEW_MASTER_IP" -p 6379 cluster info 2>/dev/null \
+        | grep -m1 '^cluster_state:' | cut -d: -f2 | tr -d '[:space:]')
+  [[ "$st" == "ok" ]] && break
+  sleep 1
+done
+
 echo "Repairing any half-finished slot migrations before rebalancing..."
-redis-cli --cluster fix "$ANCHOR_IP:6379"
+redis-cli --cluster fix "$ANCHOR_IP:6379" </dev/null >/dev/null 2>&1 || true
 
 echo "Rebalancing hash slots across all masters (fills the empty new master)..."
-redis-cli --cluster rebalance "$ANCHOR_IP:6379" --cluster-use-empty-masters
+rebalanced=0
+for attempt in 1 2 3 4 5; do
+  if redis-cli --cluster rebalance "$ANCHOR_IP:6379" --cluster-use-empty-masters; then
+    rebalanced=1; break
+  fi
+  echo "rebalance attempt $attempt failed (transient CLUSTERDOWN) - repairing and retrying..."
+  redis-cli --cluster fix "$ANCHOR_IP:6379" </dev/null >/dev/null 2>&1 || true
+  sleep 3
+done
+if [[ "$rebalanced" != "1" ]]; then
+  echo "FAIL: rebalance did not succeed after 5 attempts — new master $NEW_MASTER_IP may own no slots"
+  exit 1
+fi
+
+# Sanity-check the new master actually received slots (a rebalance can "succeed"
+# with nothing to move and leave the new master empty).
+NEW_SLOTS=$(redis-cli cluster nodes | awk -v ip="$NEW_MASTER_IP:" 'index($2,ip)==1 {for(i=9;i<=NF;i++) printf "%s ",$i}')
+if [[ -z "${NEW_SLOTS// /}" ]]; then
+  echo "FAIL: new master $NEW_MASTER_IP owns no slots after rebalance"
+  exit 1
+fi
 
 echo "scale-out: done"

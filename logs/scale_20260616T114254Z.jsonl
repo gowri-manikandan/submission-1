@@ -1,4 +1,0 @@
-{"ts":"2026-06-16T11:42:54Z","command":"scale","node":"","action":"command_start","outcome":"started","detail":"args: --add-nodes 2"}
-{"ts":"2026-06-16T11:42:54Z","command":"scale","node":"","action":"scale_out","outcome":"running","detail":"add master=10.10.0.17 replica=10.10.0.18"}
-{"ts":"2026-06-16T11:43:41Z","command":"scale","node":"","action":"scale_out","outcome":"success","detail":"master=10.10.0.17 replica=10.10.0.18 cluster=ok"}
-{"ts":"2026-06-16T11:43:42Z","command":"scale","node":"","action":"command_end","outcome":"success","detail":"exit_code=0"}
