@@ -204,6 +204,17 @@ TABLE(["Goal", "Status", "Note"], [
 P("<b>Spec/robustness fixes:</b> enforce Ansible 2.14+ (sort -V compare); Podman-agnostic "
   "bootstrap; safe IP matching with grep -F -w; per-node failure logging; status guards empty slots.")
 
+H2("Portability - making it run on a fresh machine")
+P("A new box exposed things the original masked (warm DNS, a populated known_hosts, cached "
+  "packages). A setup.sh script automates the rest (deps, SSH key, build-context copy, hosts.ini path).")
+TABLE(["Fresh-machine failure", "Cause", "Fix"], [
+    ["Host key verification failed / ssh_askpass missing", "ansible.cfg not loaded from project root, so host-key checking defaulted to strict", "redis-tool exports ANSIBLE_CONFIG; ansible.cfg + hosts.ini set StrictHostKeyChecking=no"],
+    ["apt: python3-apt has no candidate / can't fetch archive.ubuntu.com", "containers had no working DNS / outbound", "DNS (8.8.8.8/1.1.1.1) added in compose; python3-apt + build deps baked into the image"],
+    ["redis-cli: command not found after a rebuild", "containers are ephemeral; Redis is installed at runtime", "re-provision; documented that data/Redis live only in the container layer"],
+], [165, 165, 160])
+P("<b>Key realization:</b> the containers must have internet (they apt-install build tools and "
+  "download Redis source to compile). On a locked-down network that needs a proxy or mirror.")
+
 # ===== 6. INTERVIEW POINTS =====
 PageBreak()
 H1("6. Interview talking points")
@@ -229,11 +240,16 @@ QUOTE("Two lessons recur: don't mix bash into YAML, and never match cluster role
 H2("Idempotency &amp; observability")
 QUOTE("Re-running provision or upgrade is a safe no-op, and every command writes a JSON operation "
       "log with timestamps, node, action and outcome - so any run is auditable afterward.")
+H2("Portability")
+QUOTE("Moving to a fresh machine surfaced hidden assumptions - Ansible wasn't loading my config "
+      "from the project root so host-key checking blocked SSH, and the containers had no DNS to "
+      "reach apt mirrors. I exported ANSIBLE_CONFIG, set DNS in compose, baked build deps into the "
+      "image, and wrote a setup.sh - so the project bootstraps itself on any clean box.")
 
 # ===== 7. RUN / SUBMISSION =====
 H1("7. Running it")
-P("One-time setup (key baked into image):")
-CODE("cp ~/.ssh/id_rsa.pub infra/id_rsa.pub\n"
+P("One-time setup (setup.sh handles deps, SSH key, build-context copy, hosts.ini path):")
+CODE("./setup.sh --yes\n"
      "cd infra && docker compose up -d --build && cd ..")
 P("Core phases:")
 CODE("./redis-tool provision --version 7.0.15 --masters 3 --replicas-per-master 1\n"

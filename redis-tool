@@ -3,6 +3,9 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ANSIBLE_DIR="$SCRIPT_DIR/ansible"
+# Load the project's ansible.cfg no matter what directory the tool is run from
+# (otherwise host_key_checking=False is ignored and SSH host-key prompts fail).
+export ANSIBLE_CONFIG="$ANSIBLE_DIR/ansible.cfg"
 
 # --- Structured logging (S5) ---
 LOG_DIR="$SCRIPT_DIR/logs"

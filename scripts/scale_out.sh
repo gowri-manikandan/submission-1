@@ -15,9 +15,10 @@ echo "Joining new replica $NEW_REPLICA_IP to the cluster (CLUSTER MEET)..."
 redis-cli -h "$NEW_REPLICA_IP" -p 6379 CLUSTER MEET "$ANCHOR_IP" 6379
 
 # Wait until node-1 sees the new master, then grab its node id.
+# head -1 guards against a stale duplicate line for the same IP.
 MASTER_ID=""
 for i in $(seq 1 20); do
-  MASTER_ID=$(redis-cli cluster nodes | grep -F -w "$NEW_MASTER_IP" | awk '{print $1}')
+  MASTER_ID=$(redis-cli cluster nodes | grep -F -w "$NEW_MASTER_IP" | awk '{print $1}' | head -1)
   [[ -n "$MASTER_ID" ]] && break
   sleep 1
 done
@@ -27,17 +28,20 @@ if [[ -z "$MASTER_ID" ]]; then
 fi
 echo "New master node id: $MASTER_ID"
 
-# Make the new replica follow the new master (retry until gossip propagates the master id).
+# Make the new replica follow the new master. Re-read the master id on every
+# attempt, because a node can change its id if it restarts / re-handshakes.
 echo "Setting $NEW_REPLICA_IP to replicate the new master..."
 ok=0
-for i in $(seq 1 20); do
-  if redis-cli -h "$NEW_REPLICA_IP" -p 6379 CLUSTER REPLICATE "$MASTER_ID" 2>/dev/null | grep -q "OK"; then
+for i in $(seq 1 30); do
+  MASTER_ID=$(redis-cli cluster nodes | grep -F -w "$NEW_MASTER_IP" | awk '{print $1}' | head -1)
+  if [[ -n "$MASTER_ID" ]] && \
+     redis-cli -h "$NEW_REPLICA_IP" -p 6379 CLUSTER REPLICATE "$MASTER_ID" 2>/dev/null | grep -q "OK"; then
     ok=1; break
   fi
   sleep 1
 done
 if [[ "$ok" != "1" ]]; then
-  echo "FAIL: could not make $NEW_REPLICA_IP a replica of $MASTER_ID"
+  echo "FAIL: could not make $NEW_REPLICA_IP a replica of (current id of $NEW_MASTER_IP)"
   exit 1
 fi
 

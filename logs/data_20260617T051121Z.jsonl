@@ -1,0 +1,2 @@
+{"ts":"2026-06-17T05:11:21Z","command":"data","node":"","action":"command_start","outcome":"started","detail":"args: seed --keys 1000"}
+{"ts":"2026-06-17T05:11:25Z","command":"data","node":"","action":"command_end","outcome":"success","detail":"exit_code=0"}
