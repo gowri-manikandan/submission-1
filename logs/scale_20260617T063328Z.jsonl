@@ -1,0 +1,2 @@
+{"ts":"2026-06-17T06:33:28Z","command":"scale","node":"","action":"command_start","outcome":"started","detail":"args: --remove-node redis-node-7"}
+{"ts":"2026-06-17T06:33:28Z","command":"scale","node":"","action":"command_end","outcome":"failure","detail":"exit_code=1"}

@@ -244,6 +244,8 @@ ip_to_node() {
     10.10.0.14) echo "redis-node-4" ;;
     10.10.0.15) echo "redis-node-5" ;;
     10.10.0.16) echo "redis-node-6" ;;
+    10.10.0.17) echo "redis-node-7" ;;
+    10.10.0.18) echo "redis-node-8" ;;
     *) echo "" ;;
   esac
 }
@@ -418,20 +420,66 @@ cmd_scale_out() {
   cmd_status
 }
 
+# Scale IN: remove a master (by node-id) and its replica(s); migrate its slots away first.
+cmd_scale_in() {
+  local node_id="$1"
+  echo "=== Scale in: remove master $node_id and its replica(s) ==="
+  echo "(migrating its slots to the other masters first — this can take a minute)"
+  log_event "scale_in" "running" "" "remove node-id=$node_id"
+
+  local out
+  out=$(run_script_on_node1 "$SCRIPT_DIR/scripts/scale_in.sh" "$node_id") || true
+  echo "$out"
+
+  if grep -q "^FAIL:" <<< "$out"; then
+    log_event "scale_in" "failed" "" "scale_in.sh reported a failure"
+    exit 1
+  fi
+
+  local cs
+  cs=$(run_script_on_node1 "$SCRIPT_DIR/scripts/wait_cluster_ok.sh")
+  if [[ "$cs" != "cluster: ok" ]]; then
+    echo "FAIL: cluster not ok after scale-in"
+    log_event "scale_in" "failed" "" "cluster not ok after scale-in"
+    exit 1
+  fi
+
+  # Power off the freed containers (only ones we recognise as cluster nodes).
+  local ip node
+  for ip in $(grep -oE 'REMOVED_IP=[0-9.]+' <<< "$out" | cut -d= -f2); do
+    node=$(ip_to_node "$ip")
+    if [[ -n "$node" ]]; then
+      echo "Stopping container $node ($ip)..."
+      ( cd "$SCRIPT_DIR/infra" && $COMPOSE_CMD stop "$node" ) || true
+    fi
+  done
+
+  echo ""
+  echo "SCALE-IN COMPLETE - removed master $node_id and its replica(s)"
+  log_event "scale_in" "success" "" "removed node-id=$node_id"
+  echo ""
+  cmd_status
+}
+
 cmd_scale() {
   local add_nodes=0
+  local remove_node=""
   while [[ $# -gt 0 ]]; do
     case "$1" in
-      --add-nodes) add_nodes="$2"; shift 2 ;;
+      --add-nodes)   add_nodes="$2"; shift 2 ;;
+      --remove-node) remove_node="$2"; shift 2 ;;
       *) echo "Unknown option: $1"; exit 1 ;;
     esac
   done
 
-  if [[ "$add_nodes" == "2" ]]; then
+  if [[ -n "$remove_node" ]]; then
+    cmd_scale_in "$remove_node"
+  elif [[ "$add_nodes" == "2" ]]; then
     cmd_scale_out
   else
-    echo "Error: only --add-nodes 2 is supported (adds one master + one replica using the 2 spare nodes)"
-    echo "Usage: ./redis-tool scale --add-nodes 2"
+    echo "Usage:"
+    echo "  ./redis-tool scale --add-nodes 2                 # add a master + replica"
+    echo "  ./redis-tool scale --remove-node <master-node-id> # remove a master + its replica"
     exit 1
   fi
 }
