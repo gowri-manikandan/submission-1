@@ -45,21 +45,30 @@ The tool checks these for you on every run and stops if something is missing:
 
 ## 3. One-time setup (bring the servers up)
 
-The SSH public key is **baked into the container image** at build time, so SSH
-works the moment a container starts — no separate key-copy step.
+**Easiest — run the setup script.** It checks/installs Docker & Ansible, creates
+your SSH key if missing, copies the public key into the build context, and points
+`hosts.ini` at your key:
 
 ```bash
-# 1. Put your public key in the build context (so the image can COPY it)
-cp ~/.ssh/id_rsa.pub infra/id_rsa.pub
+chmod +x setup.sh
+./setup.sh            # asks before installing; use --yes to auto-confirm
+```
 
-# 2. Build the image and start the 6 containers
+The SSH public key is **baked into the container image** at build time, so SSH
+works the moment a container starts — no separate key-copy step. Then:
+
+```bash
 cd infra
-docker compose up -d --build
-docker compose ps          # should show 6 containers running
+docker compose up -d --build      # builds image (bakes in the key) + starts 6 nodes
+docker compose ps                 # should show 6 containers running
 cd ..
+cd ansible && ansible redis_nodes -m ping && cd ..   # optional: expect "pong" x6
+```
 
-# 3. Test connectivity (optional)
-cd ansible && ansible redis_nodes -m ping   # expect "pong" from all 6
+**Manual equivalent** (if you skip `setup.sh`):
+```bash
+cp ~/.ssh/id_rsa.pub infra/id_rsa.pub                 # key into build context
+# and edit ansible/inventory/hosts.ini so ansible_ssh_private_key_file points to ~/.ssh/id_rsa
 ```
 
 > If you change your SSH key later, re-copy it to `infra/id_rsa.pub` and rebuild.
@@ -219,3 +228,31 @@ task/
 > Note: a few internals still assume the original 6 nodes (the upgrade replica
 > loop). After `scale`, a later `upgrade` would need those parts made dynamic to
 > include node-7/8 — a known follow-up.
+
+---
+
+## 10. Troubleshooting (especially on a fresh machine)
+
+A brand-new machine exposes things the original box hid (it had warm DNS, a
+populated `known_hosts`, and cached packages). Common issues and fixes:
+
+| Symptom | Cause | Fix |
+|---|---|---|
+| `bad interpreter: /bin/bash^M` | Windows CRLF line endings | `sed -i 's/\r$//' setup.sh redis-tool scripts/*.sh` |
+| `Permission denied` on `./redis-tool` | not executable | `chmod +x redis-tool scripts/*.sh setup.sh` |
+| `build: id_rsa.pub not found` | key not in build context | `cp ~/.ssh/id_rsa.pub infra/id_rsa.pub` then rebuild |
+| `Connection refused` on ports 2201–2206 | containers not running | `cd infra && docker compose up -d` |
+| `Cannot connect to the Docker daemon` | Docker not started | start Docker Desktop / `sudo service docker start` |
+| `Host key verification failed` / `ssh_askpass: No such file` | `ansible.cfg` not loaded when run from project root, so `host_key_checking` defaulted to strict | fixed: `redis-tool` exports `ANSIBLE_CONFIG`, and `ansible.cfg`/`hosts.ini` set `StrictHostKeyChecking=no` |
+| apt: `python3-apt has no installation candidate` / `Failed to fetch archive.ubuntu.com` | containers can't reach the internet (bad DNS / blocked outbound) | DNS added to `compose.yml` (`8.8.8.8`, `1.1.1.1`); diagnose with `docker exec redis-node-1 ping -c1 8.8.8.8` |
+| `redis-cli: command not found` after `docker compose down`/rebuild | containers are ephemeral — Redis is installed at runtime and lives only in the container layer | re-run `provision` (the cluster + data rebuild from scratch) |
+| scale: `DUMP payload version or checksum are wrong` | `redis-cli --cluster add-node` copies Functions (fragile in 7.x) | already handled — the tool joins nodes with `CLUSTER MEET` |
+| scale: new node stuck on the old version | an old Redis was already running, so the new binary wasn't started | already handled — `provision_node` stops Redis before installing |
+
+**Setup helper:** running `./setup.sh` (or `./setup.sh --yes`) covers the
+dependency, SSH key, build-context, and `hosts.ini` path steps automatically.
+
+> **Important — the containers need internet.** This project installs build tools
+> with `apt` and downloads the Redis source to compile it, so the Docker
+> containers must have working outbound DNS + HTTP. On a locked-down/corporate
+> network you'll need a proxy or an internal mirror.
