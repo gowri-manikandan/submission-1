@@ -5,7 +5,7 @@
 ![Bash](https://img.shields.io/badge/Bash-4EAA25?logo=gnubash&logoColor=white)
 ![Ansible](https://img.shields.io/badge/Ansible-2.14%2B-EE0000?logo=ansible&logoColor=white)
 ![Redis](https://img.shields.io/badge/Redis-7.0%20to%207.2-DC382D?logo=redis&logoColor=white)
-![Podman](https://img.shields.io/badge/Podman-preferred-892CA0?logo=podman&logoColor=white)
+![Podman](https://img.shields.io/badge/Podman-supported-892CA0?logo=podman&logoColor=white)
 ![Docker](https://img.shields.io/badge/Docker-supported-2496ED?logo=docker&logoColor=white)
 ![Platform](https://img.shields.io/badge/platform-Linux%20%7C%20macOS-lightgrey)
 
