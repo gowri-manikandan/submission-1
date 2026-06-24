@@ -1,2 +1,42 @@
 {"ts":"2026-06-17T10:33:46Z","command":"status","node":"","action":"command_start","outcome":"started","detail":"args: "}
 {"ts":"2026-06-17T10:33:47Z","command":"status","node":"","action":"command_end","outcome":"success","detail":"exit_code=0"}
+{"ts":"2026-06-23T17:54:13Z","command":"./redis-tool","node":"","action":"command_start","outcome":"started","detail":"args: provision --version 7.0.15 --masters 3 --replicas-per-master 1"}
+{"ts":"2026-06-23T17:54:13Z","command":"./redis-tool","node":"","action":"command_end","outcome":"failure","detail":"exit_code=1"}
+{"ts":"2026-06-23T17:54:28Z","command":"./redis-tool","node":"","action":"command_start","outcome":"started","detail":"args: provision --version 7.0.15 --masters 3 --replicas-per-master 1"}
+{"ts":"2026-06-23T17:54:28Z","command":"./redis-tool","node":"","action":"command_end","outcome":"failure","detail":"exit_code=1"}
+{"ts":"2026-06-23T17:55:36Z","command":"provision","node":"","action":"command_start","outcome":"started","detail":"args: --version 7.0.15 --masters 3 --replicas-per-master 1"}
+{"ts":"2026-06-23T17:55:36Z","command":"provision","node":"","action":"provision","outcome":"running","detail":"version=7.0.15 masters=3 replicas=1"}
+{"ts":"2026-06-23T18:07:41Z","command":"provision","node":"","action":"provision","outcome":"success","detail":"version=7.0.15 cluster ready"}
+{"ts":"2026-06-23T18:07:41Z","command":"provision","node":"","action":"command_end","outcome":"success","detail":"exit_code=0"}
+{"ts":"2026-06-23T18:09:41Z","command":"data","node":"","action":"command_start","outcome":"started","detail":"args: seed --keys 1000"}
+{"ts":"2026-06-23T18:09:44Z","command":"data","node":"","action":"command_end","outcome":"success","detail":"exit_code=0"}
+{"ts":"2026-06-23T18:09:45Z","command":"data","node":"","action":"command_start","outcome":"started","detail":"args: verify"}
+{"ts":"2026-06-23T18:09:49Z","command":"data","node":"","action":"command_end","outcome":"success","detail":"exit_code=0"}
+{"ts":"2026-06-23T18:09:53Z","command":"status","node":"","action":"command_start","outcome":"started","detail":"args: "}
+{"ts":"2026-06-23T18:09:53Z","command":"status","node":"","action":"command_end","outcome":"success","detail":"exit_code=0"}
+{"ts":"2026-06-23T18:10:01Z","command":"upgrade","node":"","action":"command_start","outcome":"started","detail":"args: --target-version 7.2.6 --strategy rolling"}
+{"ts":"2026-06-23T18:10:05Z","command":"upgrade","node":"","action":"preflight","outcome":"passed","detail":"target=v7.2.6"}
+{"ts":"2026-06-23T18:10:05Z","command":"upgrade","node":"redis-node-4","action":"upgrade_replica","outcome":"running","detail":"ip=10.10.0.14 target=v7.2.6"}
+{"ts":"2026-06-23T18:11:50Z","command":"upgrade","node":"redis-node-4","action":"upgrade_replica","outcome":"success","detail":"ip=10.10.0.14 cluster=ok"}
+{"ts":"2026-06-23T18:11:50Z","command":"upgrade","node":"redis-node-5","action":"upgrade_replica","outcome":"running","detail":"ip=10.10.0.15 target=v7.2.6"}
+{"ts":"2026-06-23T18:13:54Z","command":"upgrade","node":"redis-node-5","action":"upgrade_replica","outcome":"success","detail":"ip=10.10.0.15 cluster=ok"}
+{"ts":"2026-06-23T18:13:54Z","command":"upgrade","node":"redis-node-6","action":"upgrade_replica","outcome":"running","detail":"ip=10.10.0.16 target=v7.2.6"}
+{"ts":"2026-06-23T18:15:35Z","command":"upgrade","node":"redis-node-6","action":"upgrade_replica","outcome":"success","detail":"ip=10.10.0.16 cluster=ok"}
+{"ts":"2026-06-23T18:15:35Z","command":"upgrade","node":"redis-node-2","action":"failover","outcome":"running","detail":"replica=10.10.0.16 promotes, master=10.10.0.12 demotes"}
+{"ts":"2026-06-23T18:15:39Z","command":"upgrade","node":"redis-node-2","action":"upgrade_master","outcome":"running","detail":"ip=10.10.0.12 target=v7.2.6"}
+{"ts":"2026-06-23T18:17:23Z","command":"upgrade","node":"redis-node-2","action":"upgrade_master","outcome":"success","detail":"ip=10.10.0.12 cluster=ok"}
+{"ts":"2026-06-23T18:17:23Z","command":"upgrade","node":"redis-node-1","action":"failover","outcome":"running","detail":"replica=10.10.0.15 promotes, master=10.10.0.11 demotes"}
+{"ts":"2026-06-23T18:17:26Z","command":"upgrade","node":"redis-node-1","action":"upgrade_master","outcome":"running","detail":"ip=10.10.0.11 target=v7.2.6"}
+{"ts":"2026-06-23T18:19:13Z","command":"upgrade","node":"redis-node-1","action":"upgrade_master","outcome":"success","detail":"ip=10.10.0.11 cluster=ok"}
+{"ts":"2026-06-23T18:19:13Z","command":"upgrade","node":"redis-node-3","action":"failover","outcome":"running","detail":"replica=10.10.0.14 promotes, master=10.10.0.13 demotes"}
+{"ts":"2026-06-23T18:19:15Z","command":"upgrade","node":"redis-node-3","action":"upgrade_master","outcome":"running","detail":"ip=10.10.0.13 target=v7.2.6"}
+{"ts":"2026-06-23T18:20:57Z","command":"upgrade","node":"redis-node-3","action":"upgrade_master","outcome":"success","detail":"ip=10.10.0.13 cluster=ok"}
+{"ts":"2026-06-23T18:21:04Z","command":"upgrade","node":"","action":"upgrade_complete","outcome":"success","detail":"all nodes on v7.2.6, data integrity verified"}
+{"ts":"2026-06-23T18:21:04Z","command":"upgrade","node":"","action":"command_end","outcome":"success","detail":"exit_code=0"}
+{"ts":"2026-06-23T19:26:33Z","command":"scale","node":"","action":"command_start","outcome":"started","detail":"args: --add-nodes 2"}
+{"ts":"2026-06-23T19:26:33Z","command":"scale","node":"","action":"scale_out","outcome":"running","detail":"add master=10.10.0.17 replica=10.10.0.18"}
+{"ts":"2026-06-23T19:29:20Z","command":"scale","node":"","action":"command_end","outcome":"failure","detail":"exit_code=2"}
+{"ts":"2026-06-23T19:29:32Z","command":"scale","node":"","action":"command_start","outcome":"started","detail":"args: --add-nodes 2"}
+{"ts":"2026-06-23T19:29:32Z","command":"scale","node":"","action":"scale_out","outcome":"running","detail":"add master=10.10.0.17 replica=10.10.0.18"}
+{"ts":"2026-06-23T19:34:36Z","command":"scale","node":"","action":"scale_out","outcome":"success","detail":"master=10.10.0.17 replica=10.10.0.18 cluster=ok"}
+{"ts":"2026-06-23T19:34:36Z","command":"scale","node":"","action":"command_end","outcome":"success","detail":"exit_code=0"}
